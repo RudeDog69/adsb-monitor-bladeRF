@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ADS-B Aircraft Monitor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @keyframes pulse-green {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .status-pulse { animation: pulse-green 2s infinite; }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen">
+    <nav class="bg-gray-800 border-b border-gray-700 p-4">
+        <div class="container mx-auto flex justify-between items-center">
+            <h1 class="text-xl font-bold text-blue-400">ADS-B Monitor</h1>
+            <div class="flex items-center space-x-6">
+                <a href="/api/logs" target="_blank" class="text-sm text-gray-400 hover:text-blue-400 transition-colors">View Logs</a>
+                <a href="/map" class="text-sm text-blue-400 hover:text-blue-300 transition-colors font-semibold border border-blue-400 px-3 py-1 rounded">View Map</a>
+                <div class="flex items-center space-x-2">
+                    <span id="engine-status-text" class="text-sm text-gray-400">Checking status...</span>
+                    <div id="engine-status-dot" class="w-3 h-3 rounded-full bg-gray-500"></div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container mx-auto p-6">
+        <div class="mb-6">
+            <h2 class="text-2xl font-semibold mb-2">Nearby Aircraft</h2>
+            <p class="text-gray-400 text-sm">Real-time telemetry from your BladeRF 2.0. Click a card for details.</p>
+        </div>
+
+        <div id="aircraft-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div class="col-span-full text-center py-12 text-gray-500">No aircraft detected in range.</div>
+        </div>
+    </main>
+
+    <!-- Modal for Details -->
+    <div id="modal-backdrop" class="fixed inset-0 modal-bg hidden flex items-center justify-center z-50 p-4" style="background-color: rgba(0,0,0,0.75);">
+        <div class="bg-gray-800 border border-gray-700 rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
+            <div class="p-6 border-b border-gray-700 flex justify-between items-center">
+                <h3 id="modal-title" class="text-xl font-bold text-blue-400">Aircraft Details</h3>
+                <button id="close-modal-x" class="text-gray-400 hover:text-white text-2xl">&times;</button>
+            </div>
+            <div id="modal-content" class="p-6 space-y-4"></div>
+            <div class="p-4 bg-gray-900 text-right">
+                <button id="close-modal-btn" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded text-white font-semibold">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentAircraftList = [];
+
+        async function updateAircraft() {
+            try {
+                const healthRes = await fetch('/api/health');
+                const health = await healthRes.json();
+                const dot = document.getElementById('engine-status-dot');
+                const text = document.getElementById('engine-status-text');
+
+                if (health.engine_running) {
+                    dot.className = 'w-3 h-3 rounded-full bg-green-500 status-pulse';
+                    text.textContent = 'Engine Active';
+                } else {
+                    dot.className = 'w-3 h-3 rounded-full bg-red-500';
+                    text.textContent = 'Engine Stopped';
+                }
+
+                const res = await fetch('/api/aircraft');
+                currentAircraftList = await res.json();
+                const grid = document.getElementById('aircraft-grid');
+
+                if (!currentAircraftList || currentAircraftList.length === 0) {
+                    grid.innerHTML = '<div class="col-span-full text-center py-12 text-gray-500">No aircraft detected in range.</div>';
+                    return;
+                }
+
+                grid.innerHTML = currentAircraftList.map((ac, idx) => `
+                    <div onclick="showDetails(${idx})" class="cursor-pointer bg-gray-800 border border-gray-700 rounded-lg p-5 shadow-lg hover:border-blue-500 transition-all transform hover:-translate-y-1">
+                        <div class="flex justify-between items-start mb-4">
+                            <div class="text-2xl font-mono font-bold text-blue-300">${ac.icao || 'N/A'}</div>
+                            <span class="text-xs text-gray-500">Updated: ${ac.last_updated || '--:--:--'}</span>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4 text-sm">
+                            <div><p class="text-gray-500 uppercase text-xs">Altitude</p><p class="font-semibold">${ac.altitude !== undefined ? ac.altitude.toFixed(0) + ' ft' : '--'}</p></div>
+                            <div><p class="text-gray-500 uppercase text-xs">Speed</p><p class="font-semibold">${ac.speed !== undefined ? ac.speed.toFixed(1) + ' kts' : '--'}</p></div>
+                            <div><p class="text-gray-500 uppercase text-xs">Lat</p><p class="font-semibold">${ac.lat !== undefined ? ac.lat.toFixed(4) : '--'}</p></div>
+                            <div><p class="text-gray-500 uppercase text-xs">Lon</p><p class="font-semibold">${ac.lon !== undefined ? ac.lon.toFixed(4) : '--'}</p></div>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        function showDetails(index) {
+            const ac = currentAircraftList[index];
+            if (!ac) return;
+
+            document.getElementById('modal-title').textContent = `Aircraft: ${ac.icao || 'Unknown'}`;
+            const content = document.getElementById('modal-content');
+            
+            const meta = [
+                { label: 'Callsign', val: ac.callsign || 'N/A' },
+                { label: 'Type', val: ac.type || 'N/A' },
+                { label: 'Altitude', val: ac.altitude !== undefined ? ac.altitude.toFixed(0) + ' ft' : '--' },
+                { label: 'Ground Speed', val: ac.speed !== undefined ? ac.speed.toFixed(1) + ' kts' : '--' },
+                { label: 'Heading', val: ac.heading !== undefined ? ac.heading.toFixed(0) + '°' : '--' },
+                { label: 'Squawk', val: ac.squawk || '--' },
+                { label: 'Latitude', val: ac.lat !== undefined ? ac.lat.toFixed(6) : '--' },
+                { label: 'Longitude', val: ac.lon !== undefined ? ac.lon.toFixed(6) : '--' }
+            ];
+
+            content.innerHTML = meta.map(m => `
+                <div class="flex justify-between border-b border-gray-700 pb-2">
+                    <span class="text-gray-400 text-sm">${m.label}</span>
+                    <span class="font-mono font-semibold text-blue-300">${m.val}</span>
+                </div>
+            `).join('');
+
+            document.getElementById('modal-backdrop').classList.remove('hidden');
+        }
+
+        document.getElementById('close-modal-x').onclick = () => document.getElementById('modal-backdrop').classList.add('hidden');
+        document.getElementById('close-modal-btn').onclick = () => document.getElementById('modal-backdrop').classList.add('hidden');
+        document.getElementById('modal-backdrop').onclick = (e) => {
+            if (e.target === document.getElementById('modal-backdrop')) document.getElementById('modal-backdrop').classList.add('hidden');
+        };
+
+        setInterval(updateAircraft, 2000);
+        updateAircraft();
+    </script>
+</body>
+</html>

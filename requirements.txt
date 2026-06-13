@@ -1,0 +1,8 @@
+numpy
+scipy
+matplotlib
+pyModeS
+fastapi
+uvicorn
+jinja2
+httpx

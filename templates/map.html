@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device, initial-scale=1.0">
+    <title>ADS-B Map View</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        body, html { height: 100%; margin: 0; overflow: hidden; }
+        #container { display: flex; flex-direction: column; height: 100vh; }
+        #map { flex-grow: 1; width: 100%; }
+        .status-pulse { animation: pulse-green 2s infinite; }
+        @keyframes pulse-green { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100">
+    <div id="container">
+        <nav class="bg-gray-800 border-b border-gray-700 p-4 h-16 flex-shrink-0 flex items-center justify-between">
+            <div class="flex items-center space-x-4">
+                <a href="/" class="text-xl font-bold text-blue-400 hover:text-blue-300 transition-colors">ADS-B Monitor</a>
+                <span class="text-gray-500">|</span>
+                <h1 class="text-lg font-medium text-gray-300">Live Aircraft Map</h1>
+            </div>
+            <div class="flex items-center space-x-6">
+                <a href="/api/logs" target="_blank" class="text-sm text-gray-400 hover:text-blue-400 transition-colors">Logs</a>
+                <div class="flex items-center space-x-2">
+                    <span id="engine-status-text" class="text-sm text-gray-400">Checking status...</span>
+                    <div id="engine-status-dot" class="w-3 h-3 rounded-full bg-gray-500"></div>
+                </div>
+            </div>
+        </nav>
+
+        <div id="map"></div>
+    </div>
+
+    <!-- Leaflet JS (No integrity check to avoid loading failures) -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <script>
+        let map;
+        let markers = new Map(); 
+        let lastAircraftList = [];
+
+        function initMap() {
+            try {
+                // Initialize map
+                map = L.map('map').setView([0, 0], 2);
+
+                // Use OpenStreetMap tiles (very reliable)
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '&copy; OpenStreetMap contributors'
+                }).addTo(map);
+
+                console.log("Map initialized successfully.");
+            } catch (e) {
+                console.error("Failed to initialize map:", e);
+            }
+        }
+
+        async function updateMap() {
+            if (!map) return;
+
+            try {
+                // 1. Engine Status
+                const healthRes = await fetch('/api/health');
+                const health = await healthRes.json();
+                const dot = document.getElementById('engine-status-dot');
+                const text = document.getElementById('engine-status-text');
+                if (health.engine_running) {
+                    dot.className = 'w-3 h-3 rounded-full bg-green-500 status-pulse';
+                    text.textContent = 'Engine Active';
+                } else {
+                    dot.className = 'w-3 h-3 rounded-full bg-red-500';
+                    text.textContent = 'Engine Stopped';
+                }
+
+                // 2. Fetch Aircraft
+                const res = await fetch('/api/aircraft');
+                const aircrafts = await res.json();
+                
+                // 3. Update Markers
+                const currentIcaos = new Set(aircrafts.map(ac => ac.icao));
+
+                // Remove old markers
+                for (const [icao, marker] of markers.entries()) {
+                    if (!currentIcaos.has(icao)) {
+                        map.removeLayer(marker);
+                        markers.delete(icao);
+                    }
+                }
+
+                // Add or Update
+                aircrafts.forEach(ac => {
+                    const lat = parseFloat(ac.lat);
+                    const lon = parseFloat(ac.lon);
+                    const icao = ac.icao;
+
+                    if (isNaN(lat) || isNaN(lon)) return;
+
+                    if (markers.has(icao)) {
+                        const marker = markers.get(icao);
+                        marker.setLatLng([lat, lon]);
+                        marker.getPopup().setContent(getPopupContent(ac));
+                    } else {
+                        const marker = L.marker([lat, lon]).addTo(map);
+                        marker.bindPopup(getPopupContent(ac));
+                        markers.set(icao, marker);
+                    }
+                });
+
+                // Auto-center on first sighting
+                if (aircrafts.length > 0 && lastAircraftList.length === 0) {
+                    map.setView([aircrafts[0].lat, aircrafts[0].lon], 6);
+                }
+
+                lastAircraftList = aircrafts;
+
+            } catch (err) {
+                console.error('Error updating map:', err);
+            }
+        }
+
+        function getPopupContent(ac) {
+            return `
+                <div style="color: #111827; font-family: sans-serif;">
+                    <div style="font-weight: bold; font-size: 1.1rem; border-bottom: 1px solid #ccc; margin-bottom: 8px;">${ac.icao}</div>
+                    <div style="font-size: 0.9rem;">
+                        <div><b>Callsign:</b> ${ac.callsign || 'N/A'}</div>
+                        <div><b>Type:</b> ${ac.type || 'N/A'}</div>
+                        <div><b>Alt:</b> ${ac.altitude ? ac.altitude.toFixed(0) + ' ft' : '--'}</div>
+                        <div><b>Speed:</b> ${ac.speed ? ac.speed.toFixed(1) + ' kts' : '--'}</div>
+                        <div><b>Heading:</b> ${ac.heading ? ac.heading.toFixed(0) + '°' : '--'}</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Start
+        window.onload = () => {
+            initMap();
+            setInterval(updateMap, 2000);
+            updateMap();
+        };
+    </script>
+</body>
+</html>

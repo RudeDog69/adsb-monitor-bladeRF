@@ -1,0 +1,34 @@
+# Git Ignore for ADS-B Project
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+
+# Logs and Data
+logs/
+*.log
+*.bin
+*.csv
+*.iq
+/tmp/adsb_continuous.bin
+/tmp/adsb_capture.bin
+/tmp/test_recorder_capture.bin
+/tmp/manual_test.bin
+
+# OS and IDE
+.DS_Store
+.vscode/
+.idea/
+.hermes/
+
+# Environment
+.env
+```bash
+# Local development files
+*.swp
+*~
+.bash_history
