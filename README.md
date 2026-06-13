@@ -30,7 +30,7 @@ A Python-based ADS-B monitoring system designed for the Nuand bladeRF 2.0 SDR. T
 ## 📦 Installation
 
 ### Option 1: Automated Installer (Recommended)
-The project includes an `install.sh` script that automates the setup of system dependencies, virtual environments, and Python packages.
+The project includes an `install.sh` script that automates the setup of system dependencies, virtual environments, and Python packages, and **configures the system as a systemd service for auto-start on boot.**
 
 1. **Clone the repository:**
    ```bash
@@ -38,7 +38,7 @@ The project includes an `install.sh` script that automates the setup of system d
    cd adsb-monitor
    ```
 
-2. **Run the installer:**
+2. **Run the installer (requires sudo):**
    ```bash
    chmod +x install.sh
    sudo ./install.sh
@@ -50,7 +50,7 @@ If you prefer to manage your own environment:
 1. **Install system dependencies:**
    ```bash
    sudo apt-get update
-   sudo apt-get install -y python3-venv python3-pip libbladerf-dev bladeRF-cli
+   sudo apt-get install -y python3-venv python3-pip libbladerf-dev bladeRF-cli git
    ```
 
 2. **Set up the virtual environment:**
@@ -61,10 +61,18 @@ If you prefer to manage your own environment:
    ```
 
 ## 🚀 Running the System
-Once installed, you can start the engine and web server with a single command:
+The system is configured to run as a systemd service.
+
+**To start/stop/check the service:**
 ```bash
-chmod +x run_web.sh
-./run_web.sh
+sudo systemctl start adsb-monitor
+sudo systemctl stop adsb-monitor
+sudo systemctl status adsb-monitor
+```
+
+**To view service logs:**
+```bash
+journalctl -u adsb-monitor -f
 ```
 
 ## 📜 License
