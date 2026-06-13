@@ -19,18 +19,38 @@ A Python-based ADS-B monitoring system designed for the Nuand bladeRF 2.0 SDR. T
 - `bladeRF-cli` (with FPGA loaded)
 - Python Packages:
   - `numpy`
-    - `pyModeS` (v3)
-  - `fastapi`
-  - `uvicorn`
-  - `jinja2`
-  - `httpx`
+    - `scipy`
+    - `matplotlib`
+    - `pyModeS`
+    - `fastapi`
+    - `uvicorn`
+    - `jinja2`
+    - `httpx`
 
-## ⚙️ Installation & Setup
+## 📦 Installation
+
+### Option 1: Automated Installer (Recommended)
+The project includes an `install.sh` script that automates the setup of system dependencies, virtual environments, and Python packages.
 
 1. **Clone the repository:**
    ```bash
    git clone <your-repo-url>
-   cd adsb_monitor
+   cd adsb-monitor
+   ```
+
+2. **Run the installer:**
+   ```bash
+   chmod +x install.sh
+   sudo ./install.sh
+   ```
+
+### Option 2: Manual Installation
+If you prefer to manage your own environment:
+
+1. **Install system dependencies:**
+   ```bash
+   sudo apt-get update
+   sudo apt-get install -y python3-venv python3-pip libbladerf-dev bladeRF-cli
    ```
 
 2. **Set up the virtual environment:**
@@ -40,14 +60,12 @@ A Python-based ADS-B monitoring system designed for the Nuand bladeRF 2.0 SDR. T
    pip install -r requirements.txt
    ```
 
-3. **Configure BladeRF:**
-   Ensure `bladeRF-cli` is installed and your FPGA bitstream is located at `/usr/share/Nuand/bladeRF/hostedxA4.rbf` (or update `recorder.py`).
-
-4. **Run the system:**
-   ```bash
-   chmod +x run_web.sh
-   ./run_web.sh
-   ```
+## 🚀 Running the System
+Once installed, you can start the engine and web server with a single command:
+```bash
+chmod +x run_web.sh
+./run_web.sh
+```
 
 ## 📜 License
 This project is licensed under the MIT License.
